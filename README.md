@@ -4,7 +4,7 @@ A local-first web app that turns your git commits and quick notes into standups,
 
 ## Status
 
-**v1 implemented.** Backend (FastAPI + SQLite) and frontend (React) are complete, with 182 offline backend tests and 18 frontend tests. The design lives in [`docs/superpowers/specs/2026-10-07-weekfeed-design.md`](docs/superpowers/specs/2026-10-07-weekfeed-design.md).
+**v1 implemented.** Backend (FastAPI + SQLite) and frontend (React) are complete, with 189 offline backend tests and 19 frontend tests. The design lives in [`docs/superpowers/specs/2026-10-07-weekfeed-design.md`](docs/superpowers/specs/2026-10-07-weekfeed-design.md).
 
 ## What it does
 

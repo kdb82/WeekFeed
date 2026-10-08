@@ -15,14 +15,14 @@ def test_migrate_creates_schema_and_sets_version(tmp_path):
     migrate(c)
     names = {r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     assert TABLES <= names
-    assert c.execute("PRAGMA user_version").fetchone()[0] == 1
+    assert c.execute("PRAGMA user_version").fetchone()[0] == 2
 
 
 def test_migrate_is_idempotent(tmp_path):
     c = connect(tmp_path / "a.db")
     migrate(c)
     migrate(c)
-    assert c.execute("PRAGMA user_version").fetchone()[0] == 1
+    assert c.execute("PRAGMA user_version").fetchone()[0] == 2
 
 
 def test_connection_pragmas(tmp_path):

@@ -25,8 +25,11 @@ export default function ChangeChips({ batch, onUndone }: { batch: Batch; onUndon
   async function undo(force: boolean) {
     setBusy(true)
     try {
-      await api.undo(batch.id, force)
+      const result = await api.undo(batch.id, force)
       setConflicts(null)
+      if (result.draft_restored === false) {
+        toast("Items undone. The draft changed after this message, so its text wasn't reverted.")
+      }
       onUndone()
     } catch (e) {
       if (e instanceof ApiError && e.code === 'undo_conflict') {

@@ -1,6 +1,7 @@
 """Agent batches: every item change an agent message made, undoable as a unit."""
 from __future__ import annotations
 
+import json
 import sqlite3
 
 from .db import transaction
@@ -58,6 +59,27 @@ def list_changes(conn, batch_id: int) -> list[BatchChange]:
     return [_change(r) for r in conn.execute("SELECT * FROM batch_changes WHERE batch_id = ? ORDER BY id", (batch_id,))]
 
 
+def set_draft_snapshots(conn, batch_id: int, before: list[dict], after: list[dict]) -> None:
+    conn.execute(
+        "UPDATE agent_batches SET draft_before = ?, draft_after = ? WHERE id = ?",
+        (json.dumps(before), json.dumps(after), batch_id),
+    )
+
+
+def _restore_draft(conn, batch_id: int) -> bool | None:
+    """Put the draft back to how it was before the batch's turn, unless it changed since then."""
+    b = conn.execute("SELECT draft_id, draft_before, draft_after FROM agent_batches WHERE id = ?", (batch_id,)).fetchone()
+    if b["draft_id"] is None or b["draft_before"] is None:
+        return None
+    d = conn.execute("SELECT status, sections FROM drafts WHERE id = ?", (b["draft_id"],)).fetchone()
+    if d is None:
+        return None
+    if d["status"] != "in_progress" or json.loads(d["sections"]) != json.loads(b["draft_after"]):
+        return False
+    conn.execute("UPDATE drafts SET sections = ?, discord_text = NULL WHERE id = ?", (b["draft_before"], b["draft_id"]))
+    return True
+
+
 def set_summary(conn, batch_id: int, summary: str) -> None:
     conn.execute("UPDATE agent_batches SET summary = ? WHERE id = ?", (summary[:200], batch_id))
 
@@ -103,5 +125,6 @@ def undo_batch(conn, batch_id: int, *, force: bool, now: str) -> UndoResult:
                     (c.old_status, closed_at, now, c.item_id),
                 )
             reverted += 1
+        draft_restored = _restore_draft(conn, batch_id)
         conn.execute("UPDATE agent_batches SET undone_at = ? WHERE id = ?", (now, batch_id))
-    return UndoResult(reverted=reverted, already_gone=gone)
+    return UndoResult(reverted=reverted, already_gone=gone, draft_restored=draft_restored)

@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from importlib import resources
 from pathlib import Path
 
-MIGRATIONS = ["0001_initial.sql"]
+MIGRATIONS = ["0001_initial.sql", "0002_batch_draft_snapshots.sql"]
 
 
 def connect(path: Path | str) -> sqlite3.Connection:

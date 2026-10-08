@@ -69,7 +69,7 @@ export const api = {
   saveNote: (text: string, label: Label, projectId: number | null) =>
     request<{ item: Item; batch: Batch }>('POST', '/notes', { text, label, project_id: projectId }),
   undo: (batchId: number, force = false) =>
-    request<{ reverted: number; already_gone: number[]; batch: Batch }>('POST', `/batches/${batchId}/undo`, { force }),
+    request<{ reverted: number; already_gone: number[]; draft_restored: boolean | null; batch: Batch }>('POST', `/batches/${batchId}/undo`, { force }),
 
   ask: (messages: ChatMessage[]) => request<AskResponse>('POST', '/ask', { messages }),
 

@@ -134,6 +134,9 @@ class UndoConflict:
 class UndoResult:
     reverted: int
     already_gone: list[int]
+    # None: the batch didn't come from a drafting chat (or its draft is gone).
+    # False: the draft changed after that message, so its text was left alone.
+    draft_restored: bool | None = None
 
 
 @dataclass(frozen=True)

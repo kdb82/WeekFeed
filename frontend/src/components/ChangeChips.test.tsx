@@ -23,12 +23,19 @@ test('lists the changes with readable labels', () => {
 })
 
 test('Undo reverts the batch and reports back', async () => {
-  const undo = vi.spyOn(api, 'undo').mockResolvedValue({ reverted: 2, already_gone: [], batch: { ...batch, undone_at: 'x' } })
+  const undo = vi.spyOn(api, 'undo').mockResolvedValue({ reverted: 2, already_gone: [], draft_restored: true, batch: { ...batch, undone_at: 'x' } })
   const onUndone = vi.fn()
   renderWithProviders(<ChangeChips batch={batch} onUndone={onUndone} />)
   fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
   await waitFor(() => expect(onUndone).toHaveBeenCalled())
   expect(undo).toHaveBeenCalledWith(12, false)
+})
+
+test('says so when the draft text changed after the message and was left alone', async () => {
+  vi.spyOn(api, 'undo').mockResolvedValue({ reverted: 2, already_gone: [], draft_restored: false, batch: { ...batch, undone_at: 'x' } })
+  renderWithProviders(<ChangeChips batch={batch} onUndone={() => {}} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+  expect(await screen.findByText(/draft changed after this message/i)).toBeInTheDocument()
 })
 
 test('a conflict opens a dialog and Undo anyway forces it', async () => {
@@ -37,7 +44,7 @@ test('a conflict opens a dialog and Undo anyway forces it', async () => {
   })
   const undo = vi.spyOn(api, 'undo')
     .mockRejectedValueOnce(conflict)
-    .mockResolvedValueOnce({ reverted: 2, already_gone: [], batch })
+    .mockResolvedValueOnce({ reverted: 2, already_gone: [], draft_restored: null, batch })
   const onUndone = vi.fn()
   renderWithProviders(<ChangeChips batch={batch} onUndone={onUndone} />)
   fireEvent.click(screen.getByRole('button', { name: 'Undo' }))

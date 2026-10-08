@@ -6,7 +6,7 @@ from tests.fakes import FakeLLM, reply, structured, tool_calls
 from tests.helpers import FakeCommit, item, project, repo
 from weekfeed import drafts
 from weekfeed.llm import AIDisabled, LLMUnavailable
-from weekfeed.store import commits, drafts as draft_store, items, settings
+from weekfeed.store import batches as batch_store, commits, drafts as draft_store, items, settings
 from weekfeed.store.errors import Invalid
 from weekfeed.store.models import Scope
 
@@ -133,6 +133,47 @@ def test_chat_turn_changes_items_and_updates_draft(conn):
     assert draft.sections == new_sections
     assert [m.role for m in draft_store.list_messages(conn, d.id)] == ["assistant", "user", "assistant"]
     assert "also pairing with Sam" in llm.prompt_text(0)
+
+
+PAIRING = [{"title": "Yesterday", "text": "- Fixed login"}, {"title": "Today", "text": "- Review PR\n- Pair with Sam"},
+           {"title": "Blockers", "text": "- DB access"}]
+
+
+def pairing_turn(conn, d):
+    llm = FakeLLM([tool_calls(("add_todo", {"text": "Pair with Sam", "project": None})),
+                   tool_calls(("update_draft", {"sections": PAIRING})), reply("Added a todo.")])
+    msg, _ = drafts.chat_turn(conn, llm, d.id, "also pairing with Sam", now=NOW)
+    return msg.batch_id
+
+
+def test_undo_restores_the_draft_text_from_before_the_message(conn):
+    d = started(conn)
+    batch_id = pairing_turn(conn, d)
+    draft_store.set_discord(conn, d.id, "cached")
+    result = batch_store.undo_batch(conn, batch_id, force=False, now="2026-10-07T16:00:00.000000+00:00")
+    assert result.draft_restored is True
+    restored = draft_store.get_draft(conn, d.id)
+    assert restored.sections == V1["sections"] and restored.discord_text is None
+    assert "Pair with Sam" not in {i.text for i in items.list_open(conn, Scope("work"))}
+
+
+def test_undo_leaves_draft_text_that_changed_after_the_message(conn):
+    d = started(conn)
+    batch_id = pairing_turn(conn, d)
+    mine = [{**s, "text": s["text"] + "\n- my own line"} if s["title"] == "Today" else s for s in PAIRING]
+    drafts.edit_sections(conn, d.id, mine)
+    result = batch_store.undo_batch(conn, batch_id, force=False, now="2026-10-07T16:00:00.000000+00:00")
+    assert result.draft_restored is False and result.reverted == 1
+    assert draft_store.get_draft(conn, d.id).sections == mine
+
+
+def test_undo_of_a_batch_without_a_draft_reports_no_draft(conn):
+    i = item(conn)
+    ctx_batch = batch_store.create_batch(conn, source="ask_chat", label="work", project_id=None, draft_id=None,
+                                         input_text="x", now=NOW.isoformat())
+    batch_store.record_change(conn, batch_id=ctx_batch.id, item=i, action="created", old_status=None, new_status=None,
+                              applied_at=i.updated_at)
+    assert batch_store.undo_batch(conn, ctx_batch.id, force=False, now="2026-10-07T16:00:00.000000+00:00").draft_restored is None
 
 
 def test_chat_turn_nudges_when_items_change_without_update_draft(conn):

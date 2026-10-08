@@ -9,6 +9,7 @@ from datetime import datetime, time, timedelta, tzinfo
 from .agent import TurnContext, run_turn
 from .llm import LLM, AIDisabled, respond_json
 from .sections import SECTION_TITLES, normalize_sections, render_record, sections_schema
+from .store import batches as batch_store
 from .store import commits as commit_store
 from .store import drafts as draft_store
 from .store import items as item_store
@@ -204,6 +205,8 @@ def _run_turn(conn, llm, draft: Draft, content: str, now: datetime) -> tuple[Dra
         nudge=lambda c: NUDGE if c.changes and not c.draft_updated else None,
     )
     updated = draft_store.get_draft(conn, draft.id)
+    if result.batch_id is not None:
+        batch_store.set_draft_snapshots(conn, result.batch_id, draft.sections, updated.sections)
     message = draft_store.add_message(
         conn, draft_id=draft.id, role="assistant", content=result.text or "Done.",
         snapshot=updated.sections if result.draft_updated else None, batch_id=result.batch_id, now=iso(now),

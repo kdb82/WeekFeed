@@ -60,6 +60,7 @@ Git, database and OpenAI code each live in exactly one module, so any one of the
 **Batches and undo**
 - Each item change is written in the same transaction as its `batch_changes` row.
 - Undo reverses a batch newest-first.
+- Undo of a drafting-chat batch also restores the draft text from before that turn, but only if the draft hasn't changed since.
 - If any of the batch's items were updated after the batch ran, Undo lists them and asks for confirmation first.
 
 **Drafts**

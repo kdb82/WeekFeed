@@ -142,6 +142,7 @@ def test_chat_turn_returns_batch_changes_and_undo(make_client):
 
     undo = c.post(f"/api/batches/{msg['batch']['id']}/undo", json={})
     assert undo.status_code == 200 and undo.json()["batch"]["undone_at"] is not None
+    assert undo.json()["draft_restored"] in (True, False)
     assert c.get("/api/items", params={"project_id": p["id"]}).json()["todos"] == []
     assert c.post(f"/api/batches/{msg['batch']['id']}/undo", json={}).status_code == 409
 
