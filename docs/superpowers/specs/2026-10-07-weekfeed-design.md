@@ -1,15 +1,15 @@
 # WeekFeed design spec
 
 - **Date:** 2026-10-07
-- **Status:** draft, being written section by section
+- **Status:** complete draft, in review
 - **UI mockup:** https://claude.ai/artifact/3ydPGE9szXdq96Aay1mRwK
 
 ## 1. Overview
 
 ### Purpose
-WeekFeed is a local web app for one person, Kaden (GitHub `kdb82`), running on their Mac. It turns the work they already record (git commits, quick notes, todos and blockers) into three things:
+WeekFeed is a local web app for one person (the author, GitHub `kdb82`), running on their Mac. It turns the work they already record (git commits, quick notes, todos and blockers) into three things:
 
-1. **Standups and weekly updates.** A standup is Yesterday / Today / Blockers. A weekly update is Done / Next / Blockers. Each can be scoped to one project or to a whole label (work, school, personal). Every draft is saved as a personal record and xVcan also be produced in a short Discord-ready format.
+1. **Standups and weekly updates.** A standup is Yesterday / Today / Blockers. A weekly update is Done / Next / Blockers. Each can be scoped to one project or to a whole label (work, school, personal). Every draft is saved as a personal record and can also be produced in a short Discord-ready format.
 2. **A personal knowledge base.** A chat agent answers questions such as "how did I fix the auth bug?" from notes and commits across every label, citing its sources.
 3. **Conversational item management.** While drafting, the user talks to an agent that adds notes, todos and blockers, closes them, and revises the draft. Every change can be undone.
 
@@ -289,7 +289,7 @@ CREATE VIRTUAL TABLE search_index USING fts5(
 
 **Discord tab:**
 1. Return `discord_text` if it's cached.
-2. Otherwise make one `llm.respond` call that turns the current sections into bold headers + `- ` bullets, titled `**Standup · Wed Oct 7 · api-server**`.
+2. Otherwise make one `llm.respond` call that turns the current sections into bold headers + `- ` bullets, titled `**Standup · Wed Oct 7 · api-server**` (weekly: `**Weekly · Sep 30 – Oct 7 · work**`).
 3. If the result is over 2,000 characters, make one "shorten" call.
 4. If it's still over, return it with `over_limit: true` so the UI can show the counter in red.
 
@@ -383,3 +383,230 @@ A saved draft is read-only in history.
 **Remove repo:** delete it; its commits and their index rows cascade.
 
 **Delete project:** confirmed by typing its name. Deletion runs as described in §3, "Deleting things."
+
+## 5. UI
+
+There are three pages, matching the mockup, plus the label-wide drafting view, which reuses the project page's layout.
+
+### 5.1 Global
+- **Top nav:** Projects · Ask · Settings.
+- **Banners** (persistent, dismissible per session):
+  - "AI features are off: add `OPENAI_API_KEY` to `.env`"
+  - "Confirm your commit emails in Settings", shown while `my_emails` is empty
+- **Toasts** report failed actions.
+- **No streaming in v1.** AI calls show a pending state ("Drafting…", "Thinking…"). The composer and the draft's buttons are disabled until the call returns.
+
+### 5.2 Projects board (`/`)
+- **Header:** the "Projects" title, the last sync time and a **Sync all** button.
+- **Columns:** one per label, always in the order Work, School, Personal, each with its own tint.
+- **Column header:** the label pill, the project count, and a **Standup for all ‹label›** link to `/labels/:label/draft`.
+- **Project card** (the whole card links to `/projects/:id`). It shows:
+  - the name
+  - repo display names
+  - chips for open todos, open blockers (red) and any repo with a `last_fetch_error` (amber)
+  - the last saved standup date, or "No standups yet"
+  - the time of the oldest fetch among its repos
+- **"+ New project"** at the bottom of each column opens an inline name field. The label comes from the column.
+- **Empty state** (no projects): a short explainer and the inline create field.
+
+### 5.3 Drafting view (`/projects/:id` and `/labels/:label/draft`)
+A single `DraftWorkspace` component serves both routes; only its scope prop differs.
+
+**Header**
+- Breadcrumb, name, label pill, repo paths, one sync chip per repo, and **Sync**.
+- On the label view, Sync covers every repo in the label.
+
+**Left column**
+- Buttons: **New standup** and **New weekly update**.
+- **History**, in this order:
+  - in-progress drafts first, marked "in progress"
+  - then saved drafts, newest first, each showing its kind and date
+- **Default selection:** the in-progress draft if there is one, otherwise the latest saved draft, otherwise an empty state with a "Start a standup" button.
+
+**Center, for an in-progress draft**
+- **Range bar** at the top: "Tue Oct 6, 9:12am → Wed Oct 7, 9:05am · 5 commits · 1 todo done · 1 note", plus a **Change range** popover with two datetime inputs.
+- **Thread:**
+  - Your messages appear as right-aligned bubbles.
+  - Assistant messages show:
+    - their text
+    - **change chips** for any batch, such as "added todo" or "resolved", with **Undo**. After an undo, the chips are struck through and marked "Undone."
+    - Earlier draft snapshots collapse to "Draft vN · replaced".
+- **Draft card** below the thread: the latest version, always expanded.
+  - It has **Record** and **Discord** tabs.
+  - Record shows one autosaving textarea per section.
+  - Discord shows the formatted text plus a character counter, which turns red over 2,000.
+  - Actions: **Copy** (copies the active tab), **Save standup** and a ⋯ menu with **Discard**.
+- **Composer** pinned at the bottom: Enter sends and Shift+Enter adds a newline.
+- **Undo conflicts** open a dialog listing the conflicting items, with **Undo anyway** and **Cancel**.
+
+**Center, for a saved draft:** the Record and Discord versions side by side, read-only, each with **Copy**. The header shows the range and the save time.
+
+**Right panel** (read-only): open **Todos**, open **Blockers** and the 5 most recent **Notes** in scope, with the hint "Change these by telling the agent." It refreshes after every chat turn and every undo.
+
+### 5.4 Ask (`/ask`)
+- **Layout:** a centered thread up to 820px wide, the composer at the bottom, and **New chat** in the header (it asks first if the thread isn't empty).
+- **Assistant answers** include:
+  - a muted "searched: term · term… → N matches" line
+  - the answer text, with inline `[n]` badges
+  - a row of **source chips** (`note · api-server · Oct 7`, `commit a1b2c3d`). Clicking a chip opens a card with the full text and its label, project and date.
+  - **Save answer as note**, which opens a label/project picker
+  - Notes the agent adds appear as change chips with Undo.
+- **State:** the thread lives only in React state. A page reload clears it.
+
+### 5.5 Settings (`/settings`)
+- **Projects:**
+  - list each project with its label pill and repo count
+  - Rename and Change label act inline
+  - Delete uses a type-the-name confirmation
+  - an add form takes a name and a label
+- **Repos:**
+  - list each repo with its path, project and fetch status
+  - each repo can be removed
+  - an add form takes a path and a project; validation errors show inline
+- **My commit emails:**
+  - a `github_username` field
+  - a checklist of every author email with its commit count, a reason chip ("your git config", "GitHub private email", "author name matches") and a "new" chip where it applies
+  - **Rescan** and **Save** buttons
+- **AI** (read-only): API key status (loaded or missing) and the model name. A hint explains these come from `.env`.
+
+### 5.6 Frontend structure
+```
+frontend/src/
+  api.ts            typed fetch wrappers, one per endpoint
+  types.ts          response types mirroring the backend's Pydantic models
+  pages/            ProjectsPage, DraftWorkspacePage, AskPage, SettingsPage
+  components/       DraftCard, ChatThread, Composer, ChangeChips, UndoButton,
+                    SourceChips, LabelPill, SyncChips, ConfirmDialog, Toasts
+```
+- **Queries:** TanStack Query keys follow resources: `['projects']`, `['drafts', scope]`, `['draft', id]`, `['items', scope]`, `['settings']`.
+- **Invalidation:** each mutation invalidates the keys it affects. For example, a chat turn invalidates `['draft', id]` and `['items', scope]`.
+
+### 5.7 API endpoints
+All endpoints live under `/api` and speak JSON. Request and response bodies are Pydantic models.
+
+| Method + path | Purpose |
+|---|---|
+| `GET /health` | `{api_key_loaded, model, git_available}` |
+| `GET /projects` | projects with card stats |
+| `POST /projects` · `PATCH /projects/{id}` · `DELETE /projects/{id}` | create; rename or relabel; delete (body: `{confirm_name}`) |
+| `POST /repos` · `DELETE /repos/{id}` | add (validates, then a full sync and detection); remove |
+| `POST /sync` | body `{project_id?, label?, force = true}`; neither id means all repos. The Ask page calls it with `force: false` when it opens. |
+| `GET /drafts?project_id=…` or `?label=…` | history for a scope |
+| `POST /drafts` | `{kind, label, project_id?}`: start or resume, returns the draft with its messages |
+| `GET /drafts/{id}` | the draft and its messages |
+| `PATCH /drafts/{id}` | `{sections}` (autosave) or `{period_start, period_end}` (change range, which regenerates) |
+| `POST /drafts/{id}/messages` | `{content}`: runs one chat turn, returns the new assistant message and the updated draft |
+| `POST /drafts/{id}/retry` | re-runs the turn for the last user message that has no reply (after a `502`) |
+| `GET /drafts/{id}/discord` | `{text, over_limit}` |
+| `POST /drafts/{id}/save` · `DELETE /drafts/{id}` | save; discard (in-progress only) |
+| `GET /items?project_id=…` or `?label=…` | the open-items panel: open todos and blockers, plus the 5 most recent notes |
+| `POST /notes` | `{text, label, project_id?}`: "Save answer as note" (recorded as an `ask_chat` batch) |
+| `POST /batches/{id}/undo` | `{force?}`; returns `409` with conflicts when needed |
+| `POST /ask` | `{messages}` → `{answer, terms, citations, batch_id?}` |
+| `GET /settings` · `PUT /settings` | `{github_username, my_emails}` |
+| `GET /settings/emails` | detected emails with counts and candidate reasons |
+
+## 6. Error handling
+
+**General rule:** a failure in one part (one repo, one AI call, one tool call) is reported where it happened, and everything else keeps working.
+
+### OpenAI (`llm`)
+| Situation | Behavior |
+|---|---|
+| `OPENAI_API_KEY` or `OPENAI_MODEL` missing | The app still starts. `/health` reports `api_key_loaded: false`, AI endpoints return `503 {"error": "ai_disabled"}`, and the UI shows the banner. |
+| Rate limit, 5xx error or timeout | The SDK retries (`max_retries = 2`, 60-second timeout). After that, `llm` raises `LLMUnavailable`. Routes turn it into `502` and the UI shows **Retry** on the message. The user's chat message is already saved, so Retry (`POST /drafts/{id}/retry`) re-runs the turn without saving it again. |
+| Auth error (bad key) | `502` with "OpenAI rejected the API key", plus a toast pointing to `.env`. No retry. |
+| Malformed structured output | One retry with the validation error included. After that, `502`. |
+| Failure in the middle of an agent turn | Writes that already happened stay and stay recorded in the batch. The assistant message is saved as "Stopped after an error · N changes applied", with Undo. |
+| 10-round limit reached | Same as above, but worded "Stopped after 10 steps". |
+| Bad tool arguments, label-lock miss, invalid transition | Returned to the model as a tool error string. The turn continues. |
+
+### Git (`git_reader`, `sync`)
+| Situation | Behavior |
+|---|---|
+| `git` not found at startup | Logged. `/health` reports `git_available: false`. Sync and repo-add endpoints return `503` with a clear message. |
+| Adding a path that doesn't exist or isn't a work tree | `422`, with the reason shown inline in Settings. |
+| Adding a path that's already registered | `409` "already added to ‹project›". |
+| Repo folder missing during sync | `last_fetch_error = "folder missing"`. The repo is skipped and an amber chip appears. |
+| Fetch fails (offline, auth, timeout) | The short reason is stored and the repo is skipped. Local commits are still read. |
+| `git log` output that won't parse | That commit is logged and skipped. The rest of the batch is stored. |
+
+### Data (`store`)
+- **Atomic writes.** Each tool write and its `batch_changes` row, an undo, a relabel and a project delete each run in one transaction.
+- **Constraint violations become HTTP errors.** Uniqueness, CHECK constraints and partial indexes are mapped to `409` or `422` with readable messages. A raw SQLite error is never passed to the client.
+- **Migrations** run at startup inside a transaction. If one fails, the app refuses to start and logs the error, which is better than running on a half-migrated database.
+
+### Drafts
+- **Discord over 2,000 characters** after the one shorten retry: `over_limit: true`, with the red counter.
+- **Saving an empty section** is allowed. On save, an empty section renders as "None."
+- **Racing a second in-progress draft** for the same scope and kind: the partial unique index rejects it, and `POST /drafts` returns the existing draft instead.
+
+### Frontend
+- TanStack Query errors render inline in the component that owns the data, with a Retry button.
+- Mutations that fail show a toast with the server's message.
+- The Undo `409` opens the conflict dialog (§4.5) instead of a toast.
+
+### Security
+- Uvicorn binds to `127.0.0.1` only.
+- CORS is disabled because the app is served from the same origin. The dev proxy makes development same-origin as well.
+- The API key is read only by `config` and `llm`, and never appears in a response or a log line.
+- `.env` and `*.db*` are gitignored. A `.env.example` with placeholder values is committed.
+
+## 7. Testing
+
+Implementation is test-first (red → green → refactor). **The whole suite runs offline.**
+
+### Backend (pytest)
+| Area | How it's tested |
+|---|---|
+| `git_reader` | Real temporary repos built with `git init`, with commits made under different author names and emails (via `GIT_AUTHOR_*` env vars), across several branches, including a merge commit (which must be excluded) and file changes. Fetch is tested against a local bare repo standing in for `origin`, plus a nonexistent remote to exercise the failure path. |
+| `store` | Temporary SQLite files with migrations applied. Covers: CHECK constraints and transitions; FTS triggers (insert, update, delete, then search finds or no longer finds the row); the porter stemming match; join-time filtering by `my_emails`; the in-progress uniqueness rule; range start from the last saved `period_end`; relabel cascading to items; project deletion keeping items. |
+| `sync` | Throttle (no fetch within 15 minutes unless forced); incremental reads with overlap and no duplicates; a missing folder; the lock (two concurrent calls fetch once). |
+| `agent` | Driven by `FakeLLM` scripts: the label lock (another label's id is "not found"); project name resolution and the unknown-name error; invalid transitions; one batch per turn, created lazily; the 10-round stop; a mid-turn error keeping earlier writes. |
+| Undo | Reverts newest-first; conflict detection → `409`; `force`; "already gone"; double undo rejected. |
+| `drafts` | v1 includes every open item; the nudge round when `update_draft` is skipped; manual edits clear the Discord cache; the shorten retry and `over_limit`; save renders `record_text`; discard keeps item changes; previous-workday fallback (Monday → Friday). |
+| `search` | Keyword extraction, then the OR query and top-15 ranking; the stop-word fallback on zero hits or a failed call; citation numbering; other authors' commits excluded. |
+| Routes | FastAPI `TestClient` with `FakeLLM` injected through dependency overrides: status codes from §6, `ai_disabled`, the `409` paths. |
+
+**Shared fixtures:**
+- `tmp_db`
+- `make_repo(commits=[...])`
+- `fake_llm(script)`
+- a frozen clock (`freezegun`), so date-range tests don't depend on the real day
+
+**`FakeLLM`** is given an ordered list of responses (a text reply, tool calls, or a structured object) and records every input it receives, so tests can check what was sent, for example "every open item was in the prompt."
+
+**Real API:** `scripts/smoke_openai.py` runs one draft and one Ask turn against the real API. It's opt-in and never part of `pytest`.
+
+### Frontend
+- **Vitest + React Testing Library** cover:
+  - `DraftCard`: switching tabs, editing triggers autosave, the counter turns red over 2,000
+  - `ChangeChips`/`UndoButton`: undo, the struck-through state, the conflict dialog on `409`
+  - `SourceChips`: expand and collapse
+  - the Settings email checklist: the "new" chip, and Save sends the checked list
+- **API mocking:** `fetch` is mocked at the `api.ts` boundary.
+- **`tsc --noEmit`** runs as part of the test command.
+- No browser end-to-end tests in v1.
+
+## 8. Configuration and repo layout
+
+**`.env`** (gitignored; `.env.example` is committed):
+```
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=<model name>
+WEEKFEED_DB_PATH=./weekfeed.db      # optional
+WEEKFEED_PORT=8765                  # optional
+```
+
+**Layout:**
+```
+WeekFeed/
+  backend/
+    weekfeed/       config, git_reader, store/, sync, llm, agent, drafts, search, api/
+    tests/
+    pyproject.toml
+  frontend/         Vite + React + TS app (see §5.6)
+  scripts/          smoke_openai.py
+  docs/superpowers/ specs/, plans/
+  .env.example  .gitignore  CLAUDE.md  README.md
+```
