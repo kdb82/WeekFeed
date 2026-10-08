@@ -17,7 +17,8 @@ interface Props {
   busy?: boolean
   onShowDiscord: () => void
   onSections: (sections: Section[]) => void
-  onSave: () => void
+  /** Called with the current text so the caller can persist it before saving. */
+  onSave: (sections: Section[]) => void
   onDiscard: () => void
 }
 
@@ -53,7 +54,17 @@ export default function DraftCard({ draft, discord, discordLoading, busy, onShow
     }, AUTOSAVE_MS)
   }
 
+  function cancelPending() {
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = null
+    const unsaved = pending.current
+    pending.current = null
+    return unsaved
+  }
+
   function showDiscord() {
+    const unsaved = cancelPending()
+    if (unsaved) onSectionsRef.current(unsaved)
     setTab('discord')
     onShowDiscord()
   }
@@ -113,7 +124,7 @@ export default function DraftCard({ draft, discord, discordLoading, busy, onShow
           <button className="btn" onClick={copy} disabled={tab === 'discord' && !discord}>
             Copy
           </button>
-          <button className="btn btn-primary" onClick={onSave} disabled={busy}>
+          <button className="btn btn-primary" onClick={() => { cancelPending(); onSave(sections) }} disabled={busy}>
             Save {kindName}
           </button>
         </div>

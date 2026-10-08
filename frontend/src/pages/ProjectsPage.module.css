@@ -1,0 +1,27 @@
+.main { width: 100%; max-width: 1240px; margin: 0 auto; padding: 28px 24px; display: flex; flex-direction: column; gap: 20px; }
+.head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.head h1 { font-size: 30px; letter-spacing: -0.02em; }
+.headRight { margin-left: auto; display: flex; align-items: center; gap: 12px; font-size: 14px; }
+.board { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.column { flex: 1 1 300px; min-width: 0; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.work { background: var(--work-col); }
+.school { background: var(--school-col); }
+.personal { background: var(--personal-col); }
+.colHead { display: flex; align-items: center; gap: 10px; padding: 2px 4px; font-size: 14px; }
+.labelLink { margin-left: auto; font-size: 13px; text-decoration: none; }
+.card {
+  display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; background: #fff; border: 1px solid var(--border);
+  border-radius: 8px; text-decoration: none; color: var(--text); box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+.card:hover { border-color: #a9b1bc; color: var(--text); box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08); }
+.cardName { font-size: 16px; }
+.repos { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.foot { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
+.newBtn {
+  font: inherit; min-height: 44px; padding: 0 14px; border: 1px dashed transparent; border-radius: 8px;
+  background: transparent; color: var(--muted); cursor: pointer; text-align: left;
+}
+.newBtn:hover { border-color: var(--border-strong); background: rgba(255, 255, 255, 0.7); }
+.newForm { display: flex; gap: 6px; }
+.newForm input { flex: 1; min-width: 0; }

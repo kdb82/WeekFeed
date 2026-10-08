@@ -80,3 +80,17 @@ test('save and discard call back', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Discard' }))
   expect(props.onDiscard).toHaveBeenCalled()
 })
+
+test('Save sends unsaved edits immediately instead of waiting for autosave', () => {
+  vi.useFakeTimers()
+  const props = setup()
+  fireEvent.change(screen.getByLabelText('Blockers'), { target: { value: '- DB access' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save standup' }))
+  expect(props.onSave).toHaveBeenCalledWith([
+    { title: 'Yesterday', text: '- Fixed login' },
+    { title: 'Today', text: '- Review PR' },
+    { title: 'Blockers', text: '- DB access' },
+  ])
+  act(() => vi.advanceTimersByTime(800))
+  expect(props.onSections).not.toHaveBeenCalled()
+})
