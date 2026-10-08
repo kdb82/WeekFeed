@@ -1,0 +1,17 @@
+.main { width: 100%; max-width: 1000px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+.main h1 { font-size: 26px; }
+.card { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 6px; }
+.card h2 { font-size: 18px; }
+.cardHead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 12px; padding-bottom: 8px; font-size: 13px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 0; border-top: 1px solid var(--border-soft); font-size: 14px; }
+.grow { flex: 999 1 240px; min-width: 0; }
+.path { font-size: 13px; overflow-wrap: anywhere; }
+.rowActions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.rowActions select { padding: 4px 8px; font-size: 13px; }
+.inline { display: flex; gap: 6px; flex: 999 1 240px; }
+.inline input { flex: 1; min-width: 0; }
+.addRow { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 14px; border-top: 1px solid var(--border-soft); }
+.addRow input:first-child { flex: 999 1 240px; min-width: 0; }
+.formError { color: var(--bad-fg); font-size: 14px; }
+.confirmLabel { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; color: var(--text); }
+.aiRow { display: flex; flex-wrap: wrap; gap: 10px 24px; font-size: 14px; }

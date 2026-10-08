@@ -7,7 +7,12 @@ A local, single-user web app (macOS, GitHub user `kdb82`) that:
 
 It only drafts text. The user copies the text and posts it themselves.
 
-**Status: design phase.** The spec at `docs/superpowers/specs/2026-10-07-weekfeed-design.md` is the source of truth. Read it before any design or implementation work. Implementation begins once the spec and its implementation plan are approved. The UI mockup is at https://claude.ai/artifact/3ydPGE9szXdq96Aay1mRwK.
+**Status: v1 implemented.** The spec at `docs/superpowers/specs/2026-10-07-weekfeed-design.md` is the source of truth; read it before changing behaviour, and update it when a change alters the design.
+
+## Commands
+
+- Backend (from `backend/`): `uv run pytest` · `uv run weekfeed` (serves API + built frontend on 127.0.0.1:8765)
+- Frontend (from `frontend/`): `npm test` (tsc + Vitest) · `npm run dev` (proxies `/api` to :8765) · `npm run build`
 
 ## Domain language
 
@@ -29,7 +34,7 @@ It only drafts text. The user copies the text and posts it themselves.
 
 - **Backend:** Python + FastAPI, SQLite with FTS5 keyword search, and the OpenAI Responses API with tool calling.
 - **Frontend:** Vite + React + TypeScript, React Router, TanStack Query, CSS modules.
-- **Layout:** `backend/`, `frontend/`.
+- **Layout:** `backend/src/weekfeed/` (src layout, tests in `backend/tests/`), `frontend/src/`.
 - **Running it:**
   - Daily use: FastAPI serves the built frontend and the API on one localhost URL.
   - Development: Vite proxies `/api` to FastAPI.
@@ -55,6 +60,7 @@ Git, database and OpenAI code each live in exactly one module, so any one of the
 **Batches and undo**
 - Each item change is written in the same transaction as its `batch_changes` row.
 - Undo reverses a batch newest-first.
+- Undo of a drafting-chat batch also restores the draft text from before that turn, but only if the draft hasn't changed since.
 - If any of the batch's items were updated after the batch ran, Undo lists them and asks for confirmation first.
 
 **Drafts**

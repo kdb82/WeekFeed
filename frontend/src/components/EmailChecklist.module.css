@@ -1,0 +1,8 @@
+.wrap { display: flex; flex-direction: column; gap: 12px; }
+.username { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 14px; }
+.username label { font-weight: 600; }
+.list { list-style: none; margin: 0; padding: 0; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 0; border-top: 1px solid var(--border-soft); font-size: 13px; }
+.row input { width: 18px; height: 18px; margin: 0; }
+.email { flex: 1 1 280px; font-family: var(--mono); font-size: 14px; overflow-wrap: anywhere; }
+.actions { display: flex; justify-content: flex-end; }

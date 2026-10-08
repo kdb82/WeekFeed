@@ -1,0 +1,8 @@
+.thread { display: flex; flex-direction: column; gap: 16px; }
+.me {
+  align-self: flex-end; max-width: 78%; background: var(--accent); color: #fff; padding: 10px 14px;
+  border-radius: 14px 14px 4px 14px; white-space: pre-wrap;
+}
+.agent { display: flex; flex-direction: column; gap: 10px; }
+.text { white-space: pre-wrap; }
+.snapshot { font-size: 13px; color: var(--muted); padding: 8px 12px; border: 1px dashed var(--border-strong); border-radius: 8px; }

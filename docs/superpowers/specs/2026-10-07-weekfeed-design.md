@@ -47,7 +47,7 @@ FastAPI routes (thin)
 ```
 
 ### Backend modules
-The backend is a Python package, `backend/weekfeed/`. Each module has one job. Git, SQLite and OpenAI code each live in exactly one module, so any of them can be swapped by editing that module alone.
+The backend is a Python package, `backend/src/weekfeed/` (src layout). Each module has one job. Git, SQLite and OpenAI code each live in exactly one module, so any of them can be swapped by editing that module alone.
 
 | Module | Job | Talks to |
 |---|---|---|
@@ -187,6 +187,7 @@ Keys:
 | `summary` | TEXT NOT NULL | |
 | `created_at` | TEXT NOT NULL | |
 | `undone_at` | TEXT NULL | |
+| `draft_before`, `draft_after` | TEXT NULL | Drafting chat only: the draft's sections (JSON) just before and after the turn, so Undo can restore the text (§4.5). |
 
 **`batch_changes`**
 | column | type | notes |
@@ -350,7 +351,8 @@ A saved draft is read-only in history.
    - `created`: delete the item.
    - `status_changed`: restore `old_status` and set `closed_at` to match.
    - An item that no longer exists is skipped and reported as "already gone."
-3. **Finish.** Set `undone_at`. A batch can be undone only once.
+3. **Restore the draft text** (same transaction; drafting-chat batches only). If the draft is still in progress and its sections still equal `draft_after`, set them back to `draft_before` and clear the cached Discord version. If the draft changed since that turn (a later turn or a hand edit), leave the text alone so no later work is lost. The response's `draft_restored` is `true`, `false` (the UI then says the text wasn't reverted) or `null` (no draft involved).
+4. **Finish.** Set `undone_at`. A batch can be undone only once.
 
 ### 4.6 Ask chat
 `POST /api/ask` takes `{messages: [{role, content}, ...]}`. The client holds the whole conversation and the server stores none of it.
@@ -602,7 +604,7 @@ WEEKFEED_PORT=8765                  # optional
 ```
 WeekFeed/
   backend/
-    weekfeed/       config, git_reader, store/, sync, llm, agent, drafts, search, api/
+    src/weekfeed/   config, git_reader, store/, sync, llm, agent, drafts, search, api/
     tests/
     pyproject.toml
   frontend/         Vite + React + TS app (see §5.6)

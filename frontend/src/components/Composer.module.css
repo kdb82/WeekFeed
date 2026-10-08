@@ -1,0 +1,9 @@
+.composer {
+  display: flex; gap: 10px; align-items: flex-end; border: 1px solid var(--border-strong);
+  border-radius: 12px; padding: 8px 8px 8px 14px; background: #fff;
+}
+.composer textarea {
+  flex: 1; min-width: 0; border: 0; outline: none; resize: none; font: inherit; font-size: 15px;
+  padding: 4px 0; background: transparent;
+}
+.composer:focus-within { border-color: var(--accent); }
