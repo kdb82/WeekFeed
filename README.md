@@ -4,7 +4,7 @@ A local-first web app that turns your git commits and quick notes into standups,
 
 ## Status
 
-**Design phase. No application code yet.** The design spec is being written section by section, and implementation starts once the spec and its implementation plan are approved. Follow along in [`docs/superpowers/specs/2026-10-07-weekfeed-design.md`](docs/superpowers/specs/2026-10-07-weekfeed-design.md).
+**v1 implemented.** Backend (FastAPI + SQLite) and frontend (React) are complete, with 182 offline backend tests and 18 frontend tests. The design lives in [`docs/superpowers/specs/2026-10-07-weekfeed-design.md`](docs/superpowers/specs/2026-10-07-weekfeed-design.md).
 
 ## What it does
 
@@ -12,7 +12,7 @@ A local-first web app that turns your git commits and quick notes into standups,
 2. **Answers questions from your own history.** Ask things like "how did I fix the auth bug?" and an agent answers from your notes and commits, citing the sources it used, and says so when it can't find an answer.
 3. **Manages todos and blockers conversationally.** While drafting, you chat with the agent to revise the draft and to add or close todos, blockers, and notes. Every set of changes it makes has a one-click Undo.
 
-## Planned UI
+## UI
 
 - **Projects board:** projects in columns by label, each card showing its repos, open todo and blocker counts, last standup, and sync status.
 - **Project page:** standup history sidebar, the drafting chat, an open-items panel, and a Sync button.
@@ -63,19 +63,40 @@ In daily use, FastAPI serves the built frontend and the API from one localhost U
 
 ## Getting started
 
-Setup instructions will be added with the first implementation. Planned prerequisites:
+Prerequisites: Python 3.12+ with [uv](https://docs.astral.sh/uv/), Node.js 20+, git, and an OpenAI API key.
 
-- Python (backend)
-- Node.js (frontend build)
-- git, with local clones of the repos you want to track
-- An OpenAI API key, stored in a gitignored `.env`
+```bash
+git clone https://github.com/kdb82/WeekFeed.git && cd WeekFeed
+cp .env.example .env            # then set OPENAI_API_KEY and OPENAI_MODEL
+
+cd frontend && npm install && npm run build && cd ..
+cd backend && uv sync && uv run weekfeed
+```
+
+Open http://127.0.0.1:8765, create projects on the board, add repo folders in Settings, and confirm which commit emails are yours.
+
+### Development
+
+```bash
+cd backend && uv run weekfeed     # API on :8765
+cd frontend && npm run dev        # Vite dev server, proxies /api to :8765
+```
+
+### Tests
+
+```bash
+cd backend && uv run pytest       # fully offline (FakeLLM, temp git repos, temp SQLite)
+cd frontend && npm test           # tsc --noEmit + Vitest
+```
+
+`scripts/smoke_openai.py` runs one draft and one Ask turn against the real API (opt-in; run from `backend/` with `uv run python ../scripts/smoke_openai.py`).
 
 ## Roadmap
 
-- [ ] Design spec (in progress)
-- [ ] Implementation plan
-- [ ] Backend: store, git reader, sync, LLM client, agent, drafts, search, API
-- [ ] Frontend: projects board, project/drafting page, Ask page, settings
+- [x] Design spec
+- [x] Backend: store, git reader, sync, LLM client, agent, drafts, search, API
+- [x] Frontend: projects board, drafting workspace, Ask page, settings
+- [ ] Streaming responses
 
 Deferred ideas:
 
