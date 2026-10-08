@@ -47,7 +47,7 @@ FastAPI routes (thin)
 ```
 
 ### Backend modules
-The backend is a Python package, `backend/weekfeed/`. Each module has one job. Git, SQLite and OpenAI code each live in exactly one module, so any of them can be swapped by editing that module alone.
+The backend is a Python package, `backend/src/weekfeed/` (src layout). Each module has one job. Git, SQLite and OpenAI code each live in exactly one module, so any of them can be swapped by editing that module alone.
 
 | Module | Job | Talks to |
 |---|---|---|
@@ -602,7 +602,7 @@ WEEKFEED_PORT=8765                  # optional
 ```
 WeekFeed/
   backend/
-    weekfeed/       config, git_reader, store/, sync, llm, agent, drafts, search, api/
+    src/weekfeed/   config, git_reader, store/, sync, llm, agent, drafts, search, api/
     tests/
     pyproject.toml
   frontend/         Vite + React + TS app (see §5.6)
