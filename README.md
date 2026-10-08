@@ -47,7 +47,7 @@ In daily use, FastAPI serves the built frontend and the API from one localhost U
 
 ## Design highlights
 
-- **Tool-calling agent with undoable batches.** One shared agent loop (at most 10 rounds per message) is reused by the drafting chat and the Ask chat, each with its own tool set. Every item change an agent message makes is written in the same transaction as a change-log row, so the whole batch can be undone as a unit, newest change first. If an item was edited after the batch ran, Undo lists it and asks before reverting.
+- **Tool-calling agent with undoable batches.** One shared agent loop (at most 10 rounds per message) is reused by the drafting chat and the Ask chat, each with its own tool set. Every item change an agent message makes is written in the same transaction as a change-log row, so the whole batch can be undone as a unit, newest change first. If an item was edited after the batch ran, Undo lists it and asks before reverting. Undoing a drafting-chat message also puts the draft text back to how it was before that message, unless the draft has changed since.
 - **Label-scoped data isolation, enforced in code.** Every project and item carries exactly one label. Agent tools can only read and change items inside the current run's label, so work, school, and personal content never mix in a draft. This is a code-level guarantee, not a prompt instruction.
 - **Keyword retrieval with citations.** The AI first expands a question into search keywords, SQLite FTS5 ranks matches with BM25, and the top 15 go to the model, which answers with `[n]` citations back to specific notes and commits. Search sits behind a single function so embedding-based search can replace it later.
 - **Clean module boundaries.** Git, SQLite, and OpenAI each live in exactly one module (`git_reader`, `store`, `llm`), so any of them can be swapped by editing one file. `sync`, `agent`, `drafts`, and `search` orchestrate those modules, and API routes are thin glue.
@@ -73,7 +73,17 @@ cd frontend && npm install && npm run build && cd ..
 cd backend && uv sync && uv run weekfeed
 ```
 
-Open http://127.0.0.1:8765, create projects on the board, add repo folders in Settings, and confirm which commit emails are yours.
+Open http://127.0.0.1:8765. Your data lives in `weekfeed.db` at the repo root (gitignored).
+
+### Using it
+
+1. **Set up (Settings).** Add a project and pick its label, add your local repo folders to it, then check which commit emails are yours and save.
+2. **Draft.** On the Projects board, open a project (or use **Standup for all …** on a label column) and click **New standup** or **New weekly update**. It syncs your repos and writes a first draft from your commits and open items.
+3. **Chat to revise.** Say things like "I'm blocked on DB access" or "I finished reviewing Sam's PR". The agent updates your todos and blockers and the draft; **Undo** reverts any message's changes. You can also edit the draft directly.
+4. **Copy and save.** Copy the **Discord** tab, paste it wherever you post, then **Save** to file it in History. The next draft for that scope starts where this one ended.
+5. **Ask.** Use the Ask page to question your own history ("how did I fix the auth bug?"). Answers cite their sources, and **Save answer as note** keeps a useful one.
+
+After pulling new changes, rebuild the frontend (`cd frontend && npm run build`) and restart `uv run weekfeed`.
 
 ### Development
 
@@ -89,7 +99,7 @@ cd backend && uv run pytest       # fully offline (FakeLLM, temp git repos, temp
 cd frontend && npm test           # tsc --noEmit + Vitest
 ```
 
-`scripts/smoke_openai.py` runs one draft and one Ask turn against the real API (opt-in; run from `backend/` with `uv run python ../scripts/smoke_openai.py`).
+`scripts/smoke_openai.py` runs a draft, a chat turn with tool calls, the Discord version and an Ask turn against the real API, using a throwaway database (opt-in; run from `backend/` with `uv run python ../scripts/smoke_openai.py`).
 
 ## Roadmap
 
