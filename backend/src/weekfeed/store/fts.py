@@ -6,6 +6,7 @@ import sqlite3
 
 from .commits import get_commit_row
 from .items import get_item
+from ..timeutil import local_date
 from .models import SearchHit
 
 
@@ -53,7 +54,7 @@ def _hydrate(conn: sqlite3.Connection, source_type: str, source_id: int, score: 
             return None
         return SearchHit(
             source_type="item", source_id=i.id, title=i.text.splitlines()[0][:80],
-            meta=f"{i.kind} · {_where(i.label, i.project_name)} · {i.created_at[:10]}",
+            meta=f"{i.kind} · {_where(i.label, i.project_name)} · {local_date(i.created_at)}",
             body=i.text, label=i.label, project_id=i.project_id, score=score,
         )
     c = get_commit_row(conn, source_id)
@@ -62,6 +63,6 @@ def _hydrate(conn: sqlite3.Connection, source_type: str, source_id: int, score: 
     body = c.message + (f"\n\nFiles: {', '.join(c.files_changed)}" if c.files_changed else "")
     return SearchHit(
         source_type="commit", source_id=c.id, title=c.message.splitlines()[0][:80] if c.message else c.sha[:7],
-        meta=f"commit {c.sha[:7]} · {_where(c.label, c.project_name)} · {c.authored_at[:10]}",
+        meta=f"commit {c.sha[:7]} · {_where(c.label, c.project_name)} · {local_date(c.authored_at)}",
         body=body, label=c.label, project_id=c.project_id, score=score,
     )

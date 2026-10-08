@@ -16,7 +16,7 @@ from .store import projects as project_store
 from .store import settings as settings_store
 from .store.errors import Conflict, Invalid
 from .store.models import CommitRow, Draft, DraftMessage, Item, Scope
-from .timeutil import iso, parse
+from .timeutil import iso, local_date, local_minute, parse
 from .tools import drafting_tools
 
 COMMIT_CAP = 200
@@ -97,12 +97,12 @@ def render_context(ctx: DraftContext) -> str:
     whole_label = " (whole label, all projects)" if ctx.scope.project_id is None else ""
     lines = [
         f"Update type: {ctx.kind}", f"Scope: {ctx.scope_name}{whole_label}",
-        f"Range: {ctx.period_start} to {ctx.period_end}", "", f"## My commits ({len(ctx.commits)})",
+        f"Range: {local_minute(ctx.period_start)} to {local_minute(ctx.period_end)} (local time)", "", f"## My commits ({len(ctx.commits)})",
     ]
     for c in ctx.commits:
         msg = c.message if len(c.message) <= MESSAGE_CHARS else c.message[:MESSAGE_CHARS] + "…"
         files = ", ".join(c.files_changed[:8]) + (" …" if len(c.files_changed) > 8 else "")
-        lines.append(f"- {_tag(c.project_name)} {c.authored_at[:10]} {c.sha[:7]}: {msg.replace(chr(10), ' / ')} (files: {files})")
+        lines.append(f"- {_tag(c.project_name)} {local_date(c.authored_at)} {c.sha[:7]}: {msg.replace(chr(10), ' / ')} (files: {files})")
     sections = [
         ("Completed in range", [f"- {_tag(i.project_name)} {i.kind} {i.status}: {i.text}" for i in ctx.closed_items]),
         ("Notes added in range", [f"- {_tag(i.project_name)} {i.text}" for i in ctx.new_notes]),
@@ -229,7 +229,7 @@ def change_range(conn: sqlite3.Connection, llm: LLM | None, draft_id: int, start
     updated = draft_store.update_sections(conn, draft_id, generate_sections(llm, ctx))
     draft_store.add_message(
         conn, draft_id=draft_id, role="assistant", snapshot=updated.sections, now=iso(now),
-        content=f"Range changed to {start_iso[:16].replace('T', ' ')} → {end_iso[:16].replace('T', ' ')} UTC. I regenerated the draft.",
+        content=f"Range changed to {local_minute(start_iso)} → {local_minute(end_iso)}. I regenerated the draft.",
     )
     return updated
 

@@ -59,3 +59,11 @@ def test_fts_syntax_characters_never_error(conn, term):
 def test_empty_terms_return_nothing(conn):
     item(conn, kind="note", text="x")
     assert fts.search(conn, [], ME) == []
+
+
+def test_meta_dates_are_local_days(conn, api_repo):
+    evening = "2026-10-08T03:00:00.000000+00:00"  # 21:00 MDT on Oct 7
+    commits.insert_commits(conn, api_repo.id, [FakeCommit("eee5555", message="late fix", authored_at=evening)])
+    item(conn, kind="note", text="late thought", now=evening)
+    metas = sorted(h.meta for h in fts.search(conn, ["late"], ME))
+    assert metas == ["commit eee5555 · work › api-server · 2026-10-07", "note · work · 2026-10-07"]

@@ -1,7 +1,10 @@
-"""Timestamp helpers. Every stored timestamp goes through iso() so the strings sort chronologically."""
+"""Timestamp helpers. Every stored timestamp goes through iso() so the strings sort chronologically.
+
+Stored timestamps are UTC; anything shown to the user (or the model) is converted to local time first.
+"""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, tzinfo
 
 
 def utcnow() -> datetime:
@@ -23,3 +26,12 @@ def parse(value: str) -> datetime:
 
 def now_iso() -> str:
     return iso(utcnow())
+
+
+def local_date(value: str, tz: tzinfo | None = None) -> str:
+    """The calendar day of a stored timestamp in local time (or `tz`), as YYYY-MM-DD."""
+    return parse(value).astimezone(tz).date().isoformat()
+
+
+def local_minute(value: str, tz: tzinfo | None = None) -> str:
+    return parse(value).astimezone(tz).strftime("%Y-%m-%d %H:%M")

@@ -58,6 +58,16 @@ def test_gather_context_and_render(conn):
     assert "[api-server]" in text and "aaa1111" in text and "auth/session.py" in text
     assert "someone else's work" not in text and "Finish lab" not in text
     assert "[General]" in text  # the blocker has no project
+    assert "Range: 2026-10-05 18:00 to 2026-10-07 09:00 (local time)" in text
+
+
+def test_render_context_dates_commits_by_local_day(conn):
+    api = project(conn, "api-server", "work")
+    r = repo(conn, api.id, "/tmp/api")
+    settings.set_my_emails(conn, ["me@example.com"])
+    commits.insert_commits(conn, r.id, [FakeCommit("ccc3333", message="late fix", authored_at="2026-10-08T03:00:00.000000+00:00")])
+    ctx = drafts.gather_context(conn, "standup", Scope("work"), "2026-10-07T00:00:00.000000+00:00", "2026-10-08T15:00:00.000000+00:00")
+    assert "2026-10-07 ccc3333" in drafts.render_context(ctx)
     assert drafts.gather_context(conn, "standup", Scope("work", api.id), "a", "z").scope_name == "api-server"
 
 
@@ -165,7 +175,8 @@ def test_change_range_regenerates(conn):
                                   "2026-10-01T00:00:00Z", "2026-10-07T15:00:00Z", now=NOW)
     assert updated.period_start == "2026-10-01T00:00:00.000000+00:00"
     assert updated.sections[0]["text"] == "- longer range"
-    assert "Range changed" in draft_store.list_messages(conn, d.id)[-1].content
+    message = draft_store.list_messages(conn, d.id)[-1].content
+    assert "Range changed to 2026-09-30 18:00 → 2026-10-07 09:00" in message  # local time, not UTC
 
 
 # --- discord, save, discard ---

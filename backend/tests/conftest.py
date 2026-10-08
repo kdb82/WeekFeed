@@ -1,6 +1,7 @@
 import itertools
 import os
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,16 @@ def conn(tmp_path):
     migrate(c)
     yield c
     c.close()
+
+
+@pytest.fixture(autouse=True)
+def mountain_time(monkeypatch):
+    """Pin the machine's local time zone so local-date output is the same on every machine."""
+    monkeypatch.setenv("TZ", "America/Denver")
+    time.tzset()
+    yield
+    monkeypatch.undo()
+    time.tzset()
 
 
 @pytest.fixture(autouse=True)
