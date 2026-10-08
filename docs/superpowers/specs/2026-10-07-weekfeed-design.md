@@ -95,6 +95,7 @@ SQLite runs in WAL mode (`PRAGMA journal_mode = WAL`), so reads never block on a
 
 Keys:
 - `my_emails`: a JSON array of lowercase author emails that count as "me."
+- `github_username`: a string such as `"kdb82"`, used only to suggest candidate emails (§4.2).
 
 **`projects`**
 | column | type | notes |
@@ -218,3 +219,167 @@ CREATE VIRTUAL TABLE search_index USING fts5(
 - **Deleting a project:** the user must type the project's name to confirm.
   - Its repos, commits and drafts (with their chats) are deleted.
   - Its **items are kept** as label-only items (`project_id → NULL`), so notes stay in the knowledge base.
+
+## 4. Flows
+
+### 4.1 Sync
+`sync.sync_repos(repos, force)` runs the following for each repo:
+
+1. **Lock.** Take that repo's lock. If a sync of the repo is already running, wait for it to finish and reuse its result.
+2. **Check the folder.** If the path no longer exists, set `last_fetch_error = "folder missing"` and skip the repo.
+3. **Fetch** when `force` is set or `last_fetched_at` is 15+ minutes old: run `git_reader.fetch`.
+   - On success, set `last_fetched_at` and clear `last_fetch_error`.
+   - On failure, store the short reason and keep going. Reading local commits still works.
+4. **Read commits.** Call `git_reader.read_commits(path, since)`:
+   - `since` is the latest stored `authored_at` for this repo minus one day, or no limit if nothing is stored yet.
+   - The read uses `git log --all --no-merges` with a machine-readable `--format` and `--name-only`.
+   - New rows are inserted, and existing `(repo_id, sha)` pairs are ignored.
+
+**When sync runs:**
+| Trigger | Scope | `force` |
+|---|---|---|
+| Sync button (project page) | that project's repos | yes |
+| Sync all (home page) | every repo | yes |
+| Starting a draft session | the draft's scope | no |
+| Opening the Ask page | every repo, in the background | no |
+| Adding a repo | that repo (full history) | yes |
+
+### 4.2 "My emails" detection
+- **When:** after a repo is added, and when the user clicks Rescan.
+- **What's shown:** Settings lists each distinct `author_email` in `commits`, with its commit count.
+- **Candidates for "me":**
+  - `git config --global user.email`
+  - each registered repo's local `user.email`
+  - any email matching `<github_username>@users.noreply.github.com` or `<digits>+<github_username>@users.noreply.github.com`
+  - any email whose commits have `author_name` equal to `github_username` (case-insensitive)
+- **Checking:**
+  - While `my_emails` is empty (first setup), candidates are pre-checked.
+  - After that, the saved list is authoritative. A newly found candidate shows a "new · looks like you" chip but stays unchecked until the user saves.
+- `github_username` is a `settings` key, edited on the Settings page. It's blank until set, and while it's blank only the git-config candidates apply.
+
+### 4.3 Drafting session
+
+**Start** (New standup / New weekly update / "Standup for all ‹label›"):
+1. **Reuse or create.** If an in-progress draft of this kind and scope exists, open it. Otherwise create one with this range:
+   - **start:** the latest saved draft's `period_end` for the same kind and scope. With none, a standup uses the previous workday at 00:00 local time (Friday if today is Monday), and a weekly update uses now minus 7 days.
+   - **end:** now.
+2. **Sync** the scope (not forced).
+3. **Gather the context** for the range:
+   - **My commits:** `author_email ∈ my_emails`, deduplicated by `sha`, newest first, capped at 200. Each one carries its project, message and changed files.
+   - todos closed and blockers resolved in the range
+   - notes created in the range
+   - all **open** todos and blockers in scope
+   - Label-wide drafts group everything by project. Items without a project go under "General."
+4. **Generate v1.** One `llm.respond` call with a structured output schema: `sections: [{title, text}]`, with titles fixed per kind (Yesterday/Today/Blockers or Done/Next/Blockers). The prompt says to include every open todo in Today/Next and every open blocker in Blockers, or write "None." Store the result as `drafts.sections` along with an assistant message carrying `draft_snapshot`.
+
+**Chat turn** (the user sends a message):
+1. Save the user message.
+2. Build the agent input:
+   - the system rules
+   - the gathered context, re-gathered so it reflects the current open items
+   - the current `sections`, including any manual edits
+   - prior messages, as text
+   
+   The full input is sent on every turn. The app doesn't rely on OpenAI's server-side conversation state, so history stays in SQLite and `FakeLLM` behaves identically.
+3. Run `agent.run_turn` with the drafting tool set (4.4).
+4. **If items changed but the model never called `update_draft`,** the server adds one more round with a nudge ("items changed; call update_draft"). That round counts toward the 10-round cap.
+5. Save the assistant message with its `draft_snapshot` and the `batch_id` if items changed. Return it.
+
+**Manual edits:** the section textareas autosave (debounced `PATCH /api/drafts/{id}`). Every change to `sections` clears `discord_text`. The next agent turn starts from the edited text.
+
+**Discord tab:**
+1. Return `discord_text` if it's cached.
+2. Otherwise make one `llm.respond` call that turns the current sections into bold headers + `- ` bullets, titled `**Standup · Wed Oct 7 · api-server**`.
+3. If the result is over 2,000 characters, make one "shorten" call.
+4. If it's still over, return it with `over_limit: true` so the UI can show the counter in red.
+
+**Change range:** update `period_start`/`period_end`, regenerate v1 (this replaces `sections`), and add an assistant message saying the range changed. Earlier messages stay.
+
+**Save:**
+1. Render `record_text` from `sections` (each title on its own line, then the section text, with a blank line between sections).
+2. Make sure `discord_text` exists, generating it if needed.
+3. Set `status = saved` and `saved_at`.
+
+A saved draft is read-only in history.
+
+**Discard** (in-progress only): deletes the draft and its messages. Item changes made during the chat stay; each batch can still be undone from its record.
+
+### 4.4 Agent turn (`agent.run_turn`)
+**Inputs:**
+- the scope: `label`, and optionally `project_id`
+- the tool set
+- the input messages
+- the source: `draft_chat` or `ask_chat`
+- `draft_id`, if any
+
+**Loop:** call `llm.respond` with the tools.
+- **Tool calls:** run each through `store`, then send the results back.
+- **Plain message:** the loop ends.
+- **Round 10 reached:** the loop stops, and the message says it stopped early.
+
+**Drafting tool set:**
+| Tool | Args | Effect |
+|---|---|---|
+| `list_open_items` | `project?` | open todos and blockers in scope, with ids |
+| `add_note` / `add_todo` / `add_blocker` | `text`, `project?` | creates an item |
+| `mark_todo_done` | `item_id` | status `open → done` |
+| `resolve_blocker` | `item_id` | status `open → resolved` |
+| `update_draft` | `sections: [{title, text}]` | replaces `drafts.sections`; titles must match the kind |
+
+**Ask tool set:** only `add_note(text, label, project?)`. Its label is required, because Ask spans every label.
+
+**Rules enforced in code** (each violation goes back to the model as a tool error, never an exception):
+- **Label lock:**
+  - An `item_id` outside the batch's label is reported as "not found."
+  - `project` is a project **name**, matched case-insensitively within the label. An unknown name returns the list of valid names.
+  - In a project-scoped run, a missing `project` defaults to the scope's project.
+- **Valid transitions:**
+  - `mark_todo_done` works only on an open todo.
+  - `resolve_blocker` works only on an open blocker.
+- **Batches:**
+  - The batch is created on the turn's first write, so read-only turns create no batch.
+  - Each write and its `batch_changes` row share one transaction.
+  - The batch `summary` is the final assistant text (first 200 characters).
+
+**Prompt rule (not enforced in code):** when it's unclear which item the user means, change nothing for that part, and ask.
+
+### 4.5 Undo
+`POST /api/batches/{id}/undo` with an optional `force`:
+1. **Load and check.** Load the batch's changes. If any changed item has `updated_at > applied_at`, and `force` isn't set, return `409` with the list ("'Review Sam's PR' was edited after this batch"). The UI shows that list and offers **Undo anyway**, which resends with `force`.
+2. **Revert, newest-first, in one transaction:**
+   - `created`: delete the item.
+   - `status_changed`: restore `old_status` and set `closed_at` to match.
+   - An item that no longer exists is skipped and reported as "already gone."
+3. **Finish.** Set `undone_at`. A batch can be undone only once.
+
+### 4.6 Ask chat
+`POST /api/ask` takes `{messages: [{role, content}, ...]}`. The client holds the whole conversation and the server stores none of it.
+
+1. **Keywords:** an `llm.respond` call with a structured schema `{terms: [string]}`. Its input is the latest question plus the previous two turns, so follow-ups resolve.
+2. **Search:**
+   - Build the FTS query: each term quoted and joined with `OR`.
+   - Filter: items from every label; commits only where `author_email ∈ my_emails`.
+   - Rank by `bm25` and take the top 15.
+   - **Zero hits or a failed keyword call:** retry with the latest question minus stop words.
+3. **Answer:** `agent.run_turn` with the Ask tool set. The input includes the numbered sources and the conversation, with these rules:
+   - answer only from the sources
+   - cite them as `[n]`
+   - if the answer isn't there, say "I couldn't find this in your notes or commits"
+4. **Return** `{answer, citations: [{n, source_type, source_id, title, meta, body}], batch_id?}`. Citation numbers restart with each answer.
+5. **"Save answer as note"** calls the same `add_note` path from the UI. The label and project come from a small picker, defaulting to the most-cited source's.
+
+### 4.7 Settings flows
+**Add project:** name + label.
+
+**Rename:** in place.
+
+**Relabel:** in one transaction, the project's items take the new label. Saved drafts keep the label they were written under.
+
+**Add repo:**
+1. The path must exist and be a git work tree (`git rev-parse --is-inside-work-tree`).
+2. Resolve it to an absolute path with symlinks resolved, then insert. A duplicate path is rejected.
+3. Run a full sync, then detection (4.2).
+
+**Remove repo:** delete it; its commits and their index rows cascade.
+
+**Delete project:** confirmed by typing its name. Deletion runs as described in §3, "Deleting things."
