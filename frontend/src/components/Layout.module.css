@@ -1,0 +1,19 @@
+.shell { min-height: 100vh; display: flex; flex-direction: column; }
+.header {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; padding: 12px 24px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.brand { font-weight: 700; font-size: 18px; letter-spacing: -0.01em; }
+.nav { display: flex; flex-wrap: wrap; gap: 4px; }
+.link {
+  display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: 6px;
+  color: #3d454f; text-decoration: none; font-weight: 500;
+}
+.link:hover { background: #eef0f3; color: var(--text); }
+.active, .active:hover { background: var(--accent-soft); color: var(--accent-hover); }
+.banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 24px;
+  background: var(--warn-bg); color: var(--warn-fg); font-size: 14px;
+}
+.banner a { color: inherit; font-weight: 600; }
+.banner code { font-family: var(--mono); font-size: 13px; }

@@ -1,0 +1,4 @@
+.pill { display: inline-flex; align-items: center; padding: 1px 9px; border-radius: 5px; font-size: 14px; font-weight: 600; }
+.work { background: var(--work-pill); color: var(--work-fg); }
+.school { background: var(--school-pill); color: var(--school-fg); }
+.personal { background: var(--personal-pill); color: var(--personal-fg); }

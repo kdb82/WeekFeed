@@ -1,0 +1,14 @@
+.wrap { display: flex; flex-direction: column; gap: 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  font: inherit; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px;
+  padding: 0 10px; border: 1px solid var(--border); border-radius: 999px; background: #fff; color: var(--text); cursor: pointer;
+}
+.chip:hover { border-color: #a9b1bc; }
+.on { border-color: var(--accent); background: var(--work-col); }
+.n {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 19px; padding: 0 5px;
+  border-radius: 5px; background: var(--accent-soft); color: var(--accent-hover); font-size: 12px; font-weight: 600;
+}
+.card { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.body { margin: 0; white-space: pre-wrap; font-family: var(--mono); font-size: 13px; }
